@@ -16,6 +16,7 @@ jobs:
   coleta:
     runs-on: ubuntu-latest
     timeout-minutes: 340
+
     steps:
       - name: Baixar o repositorio
         uses: actions/checkout@v4
@@ -61,17 +62,23 @@ jobs:
 
       - name: Salvar banco atualizado
         run: |
-          git add data/sih.db
+          git add -A
+
           if git diff --cached --quiet; then
             echo "Nada novo para salvar."
             exit 0
           fi
+
           git commit -m "Atualiza dados e estabelecimentos [skip ci]"
+
           for tentativa in 1 2 3; do
             git pull --rebase origin main
+
             if git push origin main; then
               exit 0
             fi
+
             sleep 5
           done
+
           exit 1
