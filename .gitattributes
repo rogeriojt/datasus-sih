@@ -1,1 +1,3 @@
-data/sih.db binary data/*.xlsx binary *.db binary *.xlsx binary
+data/sih.db binary
+*.db binary
+*.xlsx binary
