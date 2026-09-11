@@ -1,0 +1,77 @@
+name: Coleta automatica DATASUS SIH
+
+on:
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: coleta-datasus-sih
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  coleta:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - name: Baixar o repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Rodar testes automatizados
+        run: python -m pytest tests/ -q
+
+      - name: Configurar git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Coletar competencias pendentes
+        run: python cli.py coletar
+
+      - name: Retentar falhas
+        run: |
+          python cli.py retentar-falhas
+          python cli.py retentar-falhas
+          python cli.py retentar-falhas
+
+      - name: Atualizar municipios
+        run: python cli.py atualizar-municipios
+
+      - name: Corrigir nomes dos estabelecimentos
+        run: python cli.py corrigir-nomes --forcar
+
+      - name: Validar banco
+        run: |
+          python cli.py cobertura
+          python cli.py integridade
+
+      - name: Salvar banco atualizado
+        run: |
+          git add data/sih.db
+          if git diff --cached --quiet; then
+            echo "Nada novo para salvar."
+            exit 0
+          fi
+          git commit -m "Atualiza dados e estabelecimentos [skip ci]"
+          for tentativa in 1 2 3; do
+            git pull --rebase origin main
+            if git push origin main; then
+              exit 0
+            fi
+            sleep 5
+          done
+          exit 1
